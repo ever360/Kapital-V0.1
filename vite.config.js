@@ -13,11 +13,13 @@ export default defineConfig({
         short_name: 'Kapital POS',
         description: 'Sistema completo de Punto de Venta con gestión de inventario, ventas y reportes',
         theme_color: '#2563eb',
-        background_color: '#ffffff',
+        background_color: '#2563eb',
         display: 'standalone',
+        display_override: ['standalone', 'fullscreen'],
         orientation: 'portrait-primary',
         scope: '/',
-        start_url: '/',
+        start_url: '/?source=pwa',
+        prefer_related_applications: false,
         icons: [
           {
             src: '/icon-192.png',
@@ -72,7 +74,7 @@ export default defineConfig({
               cacheName: 'supabase-cache',
               expiration: {
                 maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 días
+                maxAgeSeconds: 60 * 60 * 24 * 7
               },
               cacheableResponse: {
                 statuses: [0, 200]
