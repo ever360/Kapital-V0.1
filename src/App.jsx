@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { supabase, getCurrentUser } from './services/supabase'
+import { ThemeProvider } from './context/ThemeContext.jsx'
 
 import Login from './pages/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
@@ -33,29 +34,31 @@ function App() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
         <div className="spinner"></div>
       </div>
     )
   }
 
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
-        
-        <Route element={user ? <Layout /> : <Navigate to="/login" />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/pos" element={<POS />} />
-          <Route path="/inventory" element={<Inventory />} />
-          <Route path="/purchases" element={<Purchases />} />
-          <Route path="/sales" element={<Sales />} />
-          <Route path="/customers" element={<Customers />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/settings" element={<Settings />} />
-        </Route>
-      </Routes>
-    </Router>
+    <ThemeProvider>
+      <Router>
+        <Routes>
+          <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
+          
+          <Route element={user ? <Layout /> : <Navigate to="/login" />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/pos" element={<POS />} />
+            <Route path="/inventory" element={<Inventory />} />
+            <Route path="/purchases" element={<Purchases />} />
+            <Route path="/sales" element={<Sales />} />
+            <Route path="/customers" element={<Customers />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/settings" element={<Settings />} />
+          </Route>
+        </Routes>
+      </Router>
+    </ThemeProvider>
   )
 }
 
