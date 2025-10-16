@@ -4,6 +4,7 @@ import { supabase, getCurrentUser } from './services/supabase'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 
 import Login from './pages/Login.jsx'
+import Register from './pages/Register.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import POS from './pages/POS.jsx'
 import Inventory from './pages/Inventory.jsx'
@@ -45,6 +46,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
+          <Route path="/register" element={!user ? <Register /> : <Navigate to="/" />} />
           
           <Route element={user ? <Layout /> : <Navigate to="/login" />}>
             <Route path="/" element={<Dashboard />} />
