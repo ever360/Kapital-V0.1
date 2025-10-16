@@ -29,5 +29,5 @@ export default defineConfig({
       }
     })
   ],
-  base: '/Kapital-V0.1/'
+ base: '/',
 })
