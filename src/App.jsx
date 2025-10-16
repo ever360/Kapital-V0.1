@@ -40,7 +40,7 @@ function App() {
   }
 
   return (
-    <Router basename="/Kapital-V0.1">
+    <Router>
       <Routes>
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
         
