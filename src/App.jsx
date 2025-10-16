@@ -2,17 +2,17 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useState, useEffect } from 'react'
 import { supabase, getCurrentUser } from './services/supabase'
 
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import POS from './pages/POS'
-import Inventory from './pages/Inventory'
-import Purchases from './pages/Purchases'
-import Sales from './pages/Sales'
-import Customers from './pages/Customers'
-import Reports from './pages/Reports'
-import Settings from './pages/Settings'
+import Login from './pages/Login.jsx'
+import Dashboard from './pages/Dashboard.jsx'
+import POS from './pages/POS.jsx'
+import Inventory from './pages/Inventory.jsx'
+import Purchases from './pages/Purchases.jsx'
+import Sales from './pages/Sales.jsx'
+import Customers from './pages/Customers.jsx'
+import Reports from './pages/Reports.jsx'
+import Settings from './pages/Settings.jsx'
 
-import Layout from './components/layout/Layout'
+import Layout from './components/layout/Layout.jsx'
 
 function App() {
   const [user, setUser] = useState(null)
