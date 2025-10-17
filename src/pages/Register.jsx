@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { signUp } from '../services/supabase'
+import { signUp, signOut } from '../services/supabase'
 import { LogIn, Mail, Lock, User, AlertCircle, Eye, EyeOff } from 'lucide-react'
 
 export default function Register() {
@@ -47,16 +47,19 @@ export default function Register() {
 
     setLoading(true)
 
-    try {
-      await signUp(formData.email, formData.password, {
-        nombre: formData.nombre,
-        apellido: formData.apellido
-      })
-      
-      setSuccess(true)
-      setTimeout(() => {
-        navigate('/login')
-      }, 2000)
+   try {
+  await signUp(formData.email, formData.password, {
+    nombre: formData.nombre,
+    apellido: formData.apellido
+  })
+  
+  // Cerrar sesión después de registrarse
+  await signOut()
+  
+  setSuccess(true)
+  setTimeout(() => {
+    navigate('/login')
+  }, 2000)
     } catch (err) {
       setError(err.message || 'Error al crear la cuenta. Intenta de nuevo.')
       console.error('Error al registrarse:', err)
