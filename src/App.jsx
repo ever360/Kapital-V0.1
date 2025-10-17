@@ -124,17 +124,4 @@ function App() {
 export default App
 ```
 
-4. **Commit changes**
 
----
-
-## 🧪 **Ahora vamos a probar el flujo completo:**
-
-### **Prueba 1: Crear un usuario admin nuevo (simulando un cliente)**
-
-1. Ve a Supabase → **Authentication** → **Users**
-2. Clic en **"Add user"** → **"Create new user"**
-3. Datos:
-```
-   Email: cliente1@test.com
-   Password: cliente123
