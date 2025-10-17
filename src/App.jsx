@@ -5,6 +5,7 @@ import { ThemeProvider } from './context/ThemeContext.jsx'
 
 import Login from './pages/Login.jsx'
 import Register from './pages/Register.jsx'
+import SetupEmpresa from './pages/SetupEmpresa.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import POS from './pages/POS.jsx'
 import Inventory from './pages/Inventory.jsx'
@@ -18,20 +19,47 @@ import Layout from './components/layout/Layout.jsx'
 
 function App() {
   const [user, setUser] = useState(null)
+  const [userData, setUserData] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getCurrentUser()
-      .then(user => setUser(user))
-      .catch(err => console.error('Error getting user:', err))
-      .finally(() => setLoading(false))
+    checkUser()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+      if (session?.user) {
+        checkUser()
+      } else {
+        setUser(null)
+        setUserData(null)
+      }
     })
 
     return () => subscription.unsubscribe()
   }, [])
+
+  const checkUser = async () => {
+    try {
+      const currentUser = await getCurrentUser()
+      setUser(currentUser)
+
+      if (currentUser) {
+        // Obtener datos adicionales del usuario
+        const { data, error } = await supabase
+          .from('usuarios')
+          .select('empresa_id, rol_sistema, primer_login')
+          .eq('id', currentUser.id)
+          .single()
+
+        if (!error && data) {
+          setUserData(data)
+        }
+      }
+    } catch (err) {
+      console.error('Error getting user:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -41,14 +69,43 @@ function App() {
     )
   }
 
+  // Componente para proteger rutas que requieren empresa configurada
+  const RequireEmpresa = ({ children }) => {
+    if (!user) return <Navigate to="/login" />
+    
+    // Super admin no necesita empresa
+    if (userData?.rol_sistema === 'super_admin') {
+      return children
+    }
+
+    // Si no tiene empresa configurada, redirigir a setup
+    if (!userData?.empresa_id) {
+      return <Navigate to="/setup" />
+    }
+
+    return children
+  }
+
   return (
     <ThemeProvider>
       <Router>
         <Routes>
+          {/* Rutas públicas */}
           <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
           <Route path="/register" element={!user ? <Register /> : <Navigate to="/" />} />
           
-          <Route element={user ? <Layout /> : <Navigate to="/login" />}>
+          {/* Ruta de configuración de empresa */}
+          <Route 
+            path="/setup" 
+            element={
+              user && !userData?.empresa_id && userData?.rol_sistema !== 'super_admin' 
+                ? <SetupEmpresa /> 
+                : <Navigate to="/" />
+            } 
+          />
+          
+          {/* Rutas privadas */}
+          <Route element={<RequireEmpresa><Layout /></RequireEmpresa>}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/pos" element={<POS />} />
             <Route path="/inventory" element={<Inventory />} />
@@ -65,3 +122,19 @@ function App() {
 }
 
 export default App
+```
+
+4. **Commit changes**
+
+---
+
+## 🧪 **Ahora vamos a probar el flujo completo:**
+
+### **Prueba 1: Crear un usuario admin nuevo (simulando un cliente)**
+
+1. Ve a Supabase → **Authentication** → **Users**
+2. Clic en **"Add user"** → **"Create new user"**
+3. Datos:
+```
+   Email: cliente1@test.com
+   Password: cliente123
