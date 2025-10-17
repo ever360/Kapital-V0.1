@@ -31,13 +31,47 @@ export const signOut = async () => {
 }
 
 export const signUp = async (email, password, userData) => {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: userData,
-    },
-  })
-  if (error) throw error
-  return data
+  try {
+    // 1. Crear usuario en Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          nombre: userData.nombre,
+          apellido: userData.apellido,
+        },
+      },
+    })
+    
+    if (authError) throw authError
+
+    // 2. Esperar a que el usuario se cree
+    if (!authData.user) {
+      throw new Error('No se pudo crear el usuario')
+    }
+
+    // 3. Guardar en la tabla usuarios
+    const { error: dbError } = await supabase
+      .from('usuarios')
+      .insert({
+        id: authData.user.id,
+        email: email,
+        nombre: userData.nombre,
+        apellido: userData.apellido,
+        activo: true,
+        rol: 'vendedor',
+        socio: false,
+      })
+
+    if (dbError) {
+      console.error('Error al guardar en tabla usuarios:', dbError)
+      // No lanzamos error porque el usuario ya existe en Auth
+    }
+
+    return authData
+  } catch (error) {
+    console.error('Error en signUp:', error)
+    throw error
+  }
 }
