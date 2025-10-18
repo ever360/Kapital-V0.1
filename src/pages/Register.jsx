@@ -1,4 +1,5 @@
-import { useState } from 'react'
+
+  import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { signUp, signOut } from '../services/supabase'
 import { LogIn, Mail, Lock, User, AlertCircle, Eye, EyeOff } from 'lucide-react'
@@ -29,7 +30,6 @@ export default function Register() {
     e.preventDefault()
     setError('')
 
-    // Validaciones
     if (!formData.nombre || !formData.apellido || !formData.email || !formData.password) {
       setError('Todos los campos son obligatorios')
       return
@@ -47,19 +47,19 @@ export default function Register() {
 
     setLoading(true)
 
-   try {
-  await signUp(formData.email, formData.password, {
-    nombre: formData.nombre,
-    apellido: formData.apellido
-  })
-  
-  // Cerrar sesión después de registrarse
-  await signOut()
-  
-  setSuccess(true)
-  setTimeout(() => {
-    navigate('/login')
-  }, 2000)
+    try {
+      await signUp(formData.email, formData.password, {
+        nombre: formData.nombre,
+        apellido: formData.apellido
+      })
+      
+      // IMPORTANTE: Cerrar sesión después de registrarse
+      await signOut()
+      
+      setSuccess(true)
+      setTimeout(() => {
+        navigate('/login')
+      }, 2000)
     } catch (err) {
       setError(err.message || 'Error al crear la cuenta. Intenta de nuevo.')
       console.error('Error al registrarse:', err)
@@ -78,7 +78,7 @@ export default function Register() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">¡Cuenta creada!</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">¡Cuenta creada con éxito!</h2>
             <p className="text-gray-600 dark:text-gray-400">Redirigiendo al inicio de sesión...</p>
           </div>
         </div>
