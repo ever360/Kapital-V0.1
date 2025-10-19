@@ -5,7 +5,7 @@ import { supabase } from '../services/supabase'
 export default function Inventory() {
   const [search, setSearch] = useState('')
   const [productos, setProductos] = useState([])
-  const [categorias, setCategor ias] = useState([])
+  const [categorias, setCategorias] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
@@ -72,7 +72,6 @@ export default function Inventory() {
     try {
       const { data, error } = await supabase
         .from('categorias')
-        .select('*')
         .eq('empresa_id', empId)
         .eq('activa', true)
         .order('nombre')
