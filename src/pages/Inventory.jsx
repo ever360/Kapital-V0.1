@@ -9,18 +9,15 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
-  const [empresaId, setEmpresaId] = useState(null)
+  const [sucursalId, setSucursalId] = useState(null)
   
   const [formData, setFormData] = useState({
-    sku: '',
+    codigo_articulo: '',
     nombre: '',
-    descripcion: '',
-    categoria_id: '',
+    marca: '',
     precio_compra: '',
     precio_venta: '',
-    stock_actual: '',
-    stock_minimo: '',
-    activo: true
+    cantidad: ''
   })
 
   useEffect(() => {
@@ -34,15 +31,15 @@ export default function Inventory() {
 
       const { data: userData } = await supabase
         .from('usuarios')
-        .select('empresa_id')
+        .select('sucursal_id')
         .eq('id', user.id)
         .single()
 
-      if (userData?.empresa_id) {
-        setEmpresaId(userData.empresa_id)
+      if (userData?.sucursal_id) {
+        setSucursalId(userData.sucursal_id)
         await Promise.all([
-          cargarProductos(userData.empresa_id),
-          cargarCategorias(userData.empresa_id)
+          cargarProductos(userData.sucursal_id),
+          cargarCategorias(userData.sucursal_id)
         ])
       }
     } catch (err) {
@@ -50,13 +47,13 @@ export default function Inventory() {
     }
   }
 
-  const cargarProductos = async (empId) => {
+  const cargarProductos = async (sucId) => {
     try {
       setLoading(true)
       const { data, error } = await supabase
         .from('productos')
-        .select('*, categorias(nombre, color)')
-        .eq('empresa_id', empId)
+        .select('*')
+        .eq('sucursal_id', sucId)
         .order('nombre')
 
       if (error) throw error
@@ -68,12 +65,12 @@ export default function Inventory() {
     }
   }
 
-  const cargarCategorias = async (empId) => {
+  const cargarCategorias = async (sucId) => {
     try {
       const { data, error } = await supabase
         .from('categorias')
-        .eq('empresa_id', empId)
-        .eq('activa', true)
+        .select('*')
+        .eq('sucursal_id', sucId)
         .order('nombre')
 
       if (error) throw error
@@ -84,25 +81,22 @@ export default function Inventory() {
   }
 
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target
+    const { name, value } = e.target
     setFormData({
       ...formData,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: value
     })
   }
 
   const abrirModalNuevo = () => {
     setEditingProduct(null)
     setFormData({
-      sku: '',
+      codigo_articulo: '',
       nombre: '',
-      descripcion: '',
-      categoria_id: '',
+      marca: '',
       precio_compra: '',
       precio_venta: '',
-      stock_actual: '',
-      stock_minimo: '',
-      activo: true
+      cantidad: ''
     })
     setShowModal(true)
   }
@@ -110,15 +104,12 @@ export default function Inventory() {
   const abrirModalEditar = (producto) => {
     setEditingProduct(producto)
     setFormData({
-      sku: producto.sku,
-      nombre: producto.nombre,
-      descripcion: producto.descripcion || '',
-      categoria_id: producto.categoria_id || '',
+      codigo_articulo: producto.codigo_articulo || '',
+      nombre: producto.nombre || '',
+      marca: producto.marca || '',
       precio_compra: producto.precio_compra || '',
       precio_venta: producto.precio_venta || '',
-      stock_actual: producto.stock_actual || '',
-      stock_minimo: producto.stock_minimo || '',
-      activo: producto.activo
+      cantidad: producto.cantidad || ''
     })
     setShowModal(true)
   }
@@ -128,16 +119,14 @@ export default function Inventory() {
 
     try {
       const productoData = {
-        empresa_id: empresaId,
-        sku: formData.sku,
+        sucursal_id: sucursalId,
+        codigo_articulo: formData.codigo_articulo,
         nombre: formData.nombre,
-        descripcion: formData.descripcion,
-        categoria_id: formData.categoria_id || null,
+        marca: formData.marca || null,
         precio_compra: parseFloat(formData.precio_compra) || 0,
         precio_venta: parseFloat(formData.precio_venta) || 0,
-        stock_actual: parseInt(formData.stock_actual) || 0,
-        stock_minimo: parseInt(formData.stock_minimo) || 0,
-        activo: formData.activo
+        cantidad: parseInt(formData.cantidad) || 0,
+        tiempo: new Date().toISOString()
       }
 
       if (editingProduct) {
@@ -160,7 +149,7 @@ export default function Inventory() {
       }
 
       setShowModal(false)
-      cargarProductos(empresaId)
+      cargarProductos(sucursalId)
     } catch (err) {
       console.error('Error al guardar producto:', err)
       alert('Error al guardar el producto: ' + err.message)
@@ -179,7 +168,7 @@ export default function Inventory() {
       if (error) throw error
 
       alert('Producto eliminado exitosamente')
-      cargarProductos(empresaId)
+      cargarProductos(sucursalId)
     } catch (err) {
       console.error('Error al eliminar producto:', err)
       alert('Error al eliminar el producto: ' + err.message)
@@ -188,18 +177,21 @@ export default function Inventory() {
 
   const productosFiltrados = productos.filter(p =>
     p.nombre.toLowerCase().includes(search.toLowerCase()) ||
-    p.sku.toLowerCase().includes(search.toLowerCase())
+    p.codigo_articulo.toLowerCase().includes(search.toLowerCase()) ||
+    (p.marca && p.marca.toLowerCase().includes(search.toLowerCase()))
   )
 
   const calcularEstadisticas = () => {
     const totalProductos = productos.length
-    const productosActivos = productos.filter(p => p.activo).length
-    const stockTotal = productos.reduce((sum, p) => sum + p.stock_actual, 0)
+    const stockTotal = productos.reduce((sum, p) => sum + (p.cantidad || 0), 0)
     const valorInventario = productos.reduce((sum, p) => 
-      sum + (p.precio_compra * p.stock_actual), 0
+      sum + ((p.precio_compra || 0) * (p.cantidad || 0)), 0
     )
+    const productosSinStock = productos.filter(p => 
+      (p.cantidad || 0) === 0
+    ).length
 
-    return { totalProductos, productosActivos, stockTotal, valorInventario }
+    return { totalProductos, stockTotal, valorInventario, productosSinStock }
   }
 
   const stats = calcularEstadisticas()
@@ -235,10 +227,6 @@ export default function Inventory() {
           <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalProductos}</p>
         </div>
         <div className="card">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Productos Activos</p>
-          <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.productosActivos}</p>
-        </div>
-        <div className="card">
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Stock Total</p>
           <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.stockTotal}</p>
         </div>
@@ -247,6 +235,10 @@ export default function Inventory() {
           <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
             ${stats.valorInventario.toLocaleString()}
           </p>
+        </div>
+        <div className="card">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Sin Stock</p>
+          <p className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.productosSinStock}</p>
         </div>
       </div>
 
@@ -259,7 +251,7 @@ export default function Inventory() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="input pl-10"
-            placeholder="Buscar productos por nombre o SKU..."
+            placeholder="Buscar productos por nombre, código o marca..."
           />
         </div>
       </div>
@@ -270,71 +262,44 @@ export default function Inventory() {
           <table className="table">
             <thead>
               <tr>
-                <th>SKU</th>
+                <th>Código</th>
                 <th>Producto</th>
-                <th>Categoría</th>
+                <th>Marca</th>
                 <th>Stock</th>
                 <th>P. Compra</th>
                 <th>P. Venta</th>
-                <th>Estado</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {productosFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <td colSpan="7" className="text-center py-8 text-gray-500 dark:text-gray-400">
                     {search ? 'No se encontraron productos' : 'No hay productos registrados'}
                   </td>
                 </tr>
               ) : (
                 productosFiltrados.map(producto => (
                   <tr key={producto.id}>
-                    <td className="font-mono text-sm">{producto.sku}</td>
+                    <td className="font-mono text-sm">{producto.codigo_articulo}</td>
                     <td>
-                      <div>
-                        <p className="font-medium text-gray-900 dark:text-gray-100">{producto.nombre}</p>
-                        {producto.descripcion && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">
-                            {producto.descripcion}
-                          </p>
-                        )}
-                      </div>
+                      <p className="font-medium text-gray-900 dark:text-gray-100">{producto.nombre}</p>
                     </td>
-                    <td>
-                      {producto.categorias ? (
-                        <span 
-                          className="text-xs px-2 py-1 rounded-full"
-                          style={{ 
-                            backgroundColor: producto.categorias.color + '20',
-                            color: producto.categorias.color 
-                          }}
-                        >
-                          {producto.categorias.nombre}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">Sin categoría</span>
-                      )}
-                    </td>
+                    <td className="text-gray-600 dark:text-gray-400">{producto.marca || '-'}</td>
                     <td>
                       <span className={`badge ${
-                        producto.stock_actual > producto.stock_minimo ? 'badge-success' : 
-                        producto.stock_actual > 0 ? 'badge-warning' : 
+                        (producto.cantidad || 0) > 10 ? 'badge-success' : 
+                        (producto.cantidad || 0) > 0 ? 'badge-warning' : 
                         'badge-danger'
                       }`}>
-                        {producto.stock_actual}
+                        {producto.cantidad || 0}
                       </span>
                     </td>
                     <td className="text-gray-600 dark:text-gray-400">
-                      ${producto.precio_compra?.toLocaleString() || 0}
+                      ${(producto.precio_compra || 0).toLocaleString()}
                     </td>
                     <td className="font-semibold text-primary-600 dark:text-primary-400">
-                      ${producto.precio_venta?.toLocaleString() || 0}
-                    </td>
-                    <td>
-                      <span className={`badge ${producto.activo ? 'badge-success' : 'badge-danger'}`}>
-                        {producto.activo ? 'Activo' : 'Inactivo'}
-                      </span>
+                      ${(producto.precio_venta || 0).toLocaleString()}
                     </td>
                     <td>
                       <div className="flex items-center gap-2">
@@ -382,34 +347,32 @@ export default function Inventory() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    SKU *
+                    Código del Artículo *
                   </label>
                   <input
                     type="text"
-                    name="sku"
-                    value={formData.sku}
+                    name="codigo_articulo"
+                    value={formData.codigo_articulo}
                     onChange={handleInputChange}
                     className="input"
-                    placeholder="PROD001"
+                    placeholder="COD001"
                     required
+                    disabled={!!editingProduct}
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Categoría
+                    Marca
                   </label>
-                  <select
-                    name="categoria_id"
-                    value={formData.categoria_id}
+                  <input
+                    type="text"
+                    name="marca"
+                    value={formData.marca}
                     onChange={handleInputChange}
                     className="input"
-                  >
-                    <option value="">Sin categoría</option>
-                    {categorias.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.nombre}</option>
-                    ))}
-                  </select>
+                    placeholder="Marca del producto"
+                  />
                 </div>
               </div>
 
@@ -428,21 +391,7 @@ export default function Inventory() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Descripción
-                </label>
-                <textarea
-                  name="descripcion"
-                  value={formData.descripcion}
-                  onChange={handleInputChange}
-                  className="input"
-                  rows="3"
-                  placeholder="Descripción del producto (opcional)"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Precio de Compra
@@ -475,52 +424,21 @@ export default function Inventory() {
                     required
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Stock Actual
+                    Cantidad (Stock)
                   </label>
                   <input
                     type="number"
-                    name="stock_actual"
-                    value={formData.stock_actual}
+                    name="cantidad"
+                    value={formData.cantidad}
                     onChange={handleInputChange}
                     className="input"
                     placeholder="0"
                     min="0"
                   />
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Stock Mínimo
-                  </label>
-                  <input
-                    type="number"
-                    name="stock_minimo"
-                    value={formData.stock_minimo}
-                    onChange={handleInputChange}
-                    className="input"
-                    placeholder="0"
-                    min="0"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="activo"
-                  name="activo"
-                  checked={formData.activo}
-                  onChange={handleInputChange}
-                  className="w-4 h-4"
-                />
-                <label htmlFor="activo" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Producto activo
-                </label>
               </div>
 
               <div className="flex gap-3 pt-4">
