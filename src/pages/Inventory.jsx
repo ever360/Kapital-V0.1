@@ -26,9 +26,8 @@ export default function Inventory() {
     precio_compra: '',
     precio_venta: '',
     stock_inicial: '',
-    alerta_stock: '5',
-    unidad_medida: 'unidad',
-    incluye_segundas: false
+    alerta_stock: '10',
+    segundas_enviadas: '0'
   })
 
   useEffect(() => {
@@ -129,6 +128,7 @@ export default function Inventory() {
       const precioCompra = parseFloat(productoForm.precio_compra) || 0
       const precioVenta = parseFloat(productoForm.precio_venta) || 0
       const stockInicial = parseInt(productoForm.stock_inicial) || 0
+      const segundasEnviadas = parseInt(productoForm.segundas_enviadas) || 0
 
       const nuevoProducto = {
         sucursal_id: sucursalId,
@@ -139,10 +139,10 @@ export default function Inventory() {
         precio_venta: precioVenta,
         stock_inicial: stockInicial,
         stock_actual: stockInicial,
-        alerta_stock: parseInt(productoForm.alerta_stock) || 5,
-        unidad_medida: productoForm.unidad_medida,
-        incluye_segundas: productoForm.incluye_segundas,
+        alerta_stock: parseInt(productoForm.alerta_stock) || 10,
+        segundas_enviadas: segundasEnviadas,
         utilidad_articulo: precioVenta - precioCompra,
+        porcentaje_utilidad: precioCompra > 0 ? ((precioVenta - precioCompra) / precioCompra * 100) : 0,
         ventas: 0,
         compras: 0,
         devoluciones: 0
@@ -171,9 +171,8 @@ export default function Inventory() {
         precio_compra: '',
         precio_venta: '',
         stock_inicial: '',
-        alerta_stock: '5',
-        unidad_medida: 'unidad',
-        incluye_segundas: false
+        alerta_stock: '10',
+        segundas_enviadas: '0'
       })
       
       setShowProductoModal(false)
@@ -196,13 +195,13 @@ export default function Inventory() {
         grupos[cat] = {
           categoria: cat,
           productos: [],
-          productosSegunda: [],
           totales: {
             cantidad: 0,
             stockInicial: 0,
             compras: 0,
             ventas: 0,
             devoluciones: 0,
+            segundasEnviadas: 0,
             valorCompra: 0,
             valorVenta: 0,
             utilidad: 0
@@ -210,12 +209,7 @@ export default function Inventory() {
         }
       }
       
-      // Separar primera de segunda
-      if (prod.incluye_segundas || prod.categoria?.toLowerCase().includes('segunda')) {
-        grupos[cat].productosSegunda.push(prod)
-      } else {
-        grupos[cat].productos.push(prod)
-      }
+      grupos[cat].productos.push(prod)
       
       // Acumular totales
       grupos[cat].totales.cantidad += prod.stock_actual || 0
@@ -223,6 +217,7 @@ export default function Inventory() {
       grupos[cat].totales.compras += prod.compras || 0
       grupos[cat].totales.ventas += prod.ventas || 0
       grupos[cat].totales.devoluciones += prod.devoluciones || 0
+      grupos[cat].totales.segundasEnviadas += prod.segundas_enviadas || 0
       grupos[cat].totales.valorCompra += (prod.precio_compra || 0) * (prod.stock_actual || 0)
       grupos[cat].totales.valorVenta += (prod.precio_venta || 0) * (prod.stock_actual || 0)
       grupos[cat].totales.utilidad += (prod.utilidad_articulo || 0) * (prod.stock_actual || 0)
@@ -246,6 +241,7 @@ export default function Inventory() {
       totalCategorias: grupos.length,
       totalProductos: productos.length,
       stockTotal: productos.reduce((sum, p) => sum + (p.stock_actual || 0), 0),
+      segundasTotal: productos.reduce((sum, p) => sum + (p.segundas_enviadas || 0), 0),
       valorTotal: productos.reduce((sum, p) => sum + ((p.precio_compra || 0) * (p.stock_actual || 0)), 0)
     }
   }
@@ -261,42 +257,43 @@ export default function Inventory() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="px-2 sm:px-4 lg:px-6">
+      {/* Header responsive */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
             Inventario por Categorías
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Vista agrupada con detalle</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Vista agrupada con detalle</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2 sm:gap-3">
           <button 
             onClick={() => setShowCategoriaModal(true)}
-            className="btn btn-secondary flex items-center gap-2"
+            className="btn btn-secondary flex items-center gap-2 flex-1 sm:flex-initial justify-center"
           >
             <FolderPlus className="w-5 h-5" />
-            Categorías
+            <span className="hidden sm:inline">Categorías</span>
           </button>
           <button 
             onClick={() => setShowProductoModal(true)}
-            className="btn btn-primary flex items-center gap-2"
+            className="btn btn-primary flex items-center gap-2 flex-1 sm:flex-initial justify-center"
           >
             <Plus className="w-5 h-5" />
-            Agregar Producto
+            <span>Agregar</span>
           </button>
         </div>
       </div>
 
-      {/* Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      {/* Estadísticas responsive */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
         <div className="card bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-500 rounded-lg">
-              <Tag className="w-6 h-6 text-white" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-2 sm:p-3 bg-blue-500 rounded-lg">
+              <Tag className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Categorías</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Categorías</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
                 {stats.totalCategorias}
               </p>
             </div>
@@ -304,13 +301,13 @@ export default function Inventory() {
         </div>
 
         <div className="card bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-green-500 rounded-lg">
-              <Package className="w-6 h-6 text-white" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-2 sm:p-3 bg-green-500 rounded-lg">
+              <Package className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Productos</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Productos</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
                 {stats.totalProductos}
               </p>
             </div>
@@ -318,27 +315,41 @@ export default function Inventory() {
         </div>
 
         <div className="card bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-purple-500 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-white" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-2 sm:p-3 bg-purple-500 rounded-lg">
+              <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Stock Total</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Stock Total</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
                 {stats.stockTotal}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="card bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-yellow-500 rounded-lg">
-              <DollarSign className="w-6 h-6 text-white" />
+        <div className="card bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-2 sm:p-3 bg-orange-500 rounded-lg">
+              <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Valor Total</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Segundas</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
+                {stats.segundasTotal}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 col-span-2 lg:col-span-1">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-2 sm:p-3 bg-yellow-500 rounded-lg">
+              <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Valor Total</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
                 ${stats.valorTotal.toLocaleString()}
               </p>
             </div>
@@ -372,63 +383,69 @@ export default function Inventory() {
         ) : (
           gruposFiltrados.map((grupo) => (
             <div key={grupo.categoria} className="card hover:shadow-lg transition-shadow">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
                     <Tag className="w-5 h-5 text-primary-600" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100">
                       {grupo.categoria}
                     </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {grupo.productos.length + grupo.productosSegunda.length} productos
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                      {grupo.productos.length} productos
+                      {grupo.totales.segundasEnviadas > 0 && (
+                        <span className="ml-2 text-orange-600">
+                          ({grupo.totales.segundasEnviadas} segundas)
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => verDetalle(grupo)}
-                  className="btn btn-secondary flex items-center gap-2"
+                  className="btn btn-secondary flex items-center gap-2 justify-center w-full sm:w-auto"
                 >
                   <Eye className="w-4 h-4" />
-                  Ver detalle
+                  <span>Ver detalle</span>
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+              {/* Grid de totales responsive */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-2 sm:p-3 rounded-lg">
                   <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Stock Inicial</p>
-                  <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                  <p className="text-base sm:text-lg font-bold text-blue-600 dark:text-blue-400">
                     {grupo.totales.stockInicial}
                   </p>
                 </div>
-                <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
+                <div className="bg-green-50 dark:bg-green-900/20 p-2 sm:p-3 rounded-lg">
                   <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Compras</p>
-                  <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                  <p className="text-base sm:text-lg font-bold text-green-600 dark:text-green-400">
                     +{grupo.totales.compras}
                   </p>
                 </div>
-                <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg">
+                <div className="bg-purple-50 dark:bg-purple-900/20 p-2 sm:p-3 rounded-lg">
                   <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Ventas</p>
-                  <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                  <p className="text-base sm:text-lg font-bold text-purple-600 dark:text-purple-400">
                     -{grupo.totales.ventas}
                   </p>
                 </div>
-                <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Devoluciones</p>
-                  <p className="text-lg font-bold text-orange-600 dark:text-orange-400">
-                    {grupo.totales.devoluciones}
+                <div className="bg-orange-50 dark:bg-orange-900/20 p-2 sm:p-3 rounded-lg">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Segundas</p>
+                  <p className="text-base sm:text-lg font-bold text-orange-600 dark:text-orange-400">
+                    {grupo.totales.segundasEnviadas}
                   </p>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                <div className="bg-gray-50 dark:bg-gray-700 p-2 sm:p-3 rounded-lg">
                   <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Stock Actual</p>
-                  <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                  <p className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">
                     {grupo.totales.cantidad}
                   </p>
                 </div>
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Valor Total</p>
-                  <p className="text-sm font-bold text-yellow-600 dark:text-yellow-400">
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 p-2 sm:p-3 rounded-lg col-span-2 sm:col-span-3 lg:col-span-1">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Valor</p>
+                  <p className="text-sm sm:text-base font-bold text-yellow-600 dark:text-yellow-400">
                     ${grupo.totales.valorCompra.toLocaleString()}
                   </p>
                 </div>
@@ -438,12 +455,12 @@ export default function Inventory() {
         )}
       </div>
 
-      {/* ========== MODAL DE CATEGORÍAS ========== */}
+      {/* ========== MODAL DE CATEGORÍAS (Responsive) ========== */}
       {showCategoriaModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
                 Gestión de Categorías
               </h3>
               <button 
@@ -479,14 +496,14 @@ export default function Inventory() {
                   No hay categorías creadas
                 </p>
               ) : (
-                <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-96 overflow-y-auto">
                   {categorias.map(cat => (
                     <div 
                       key={cat.id}
                       className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
                     >
-                      <Tag className="w-4 h-4 text-primary-600" />
-                      <span className="font-medium text-gray-900 dark:text-gray-100 flex-1">
+                      <Tag className="w-4 h-4 text-primary-600 flex-shrink-0" />
+                      <span className="font-medium text-gray-900 dark:text-gray-100 flex-1 truncate">
                         {cat.nombre}
                       </span>
                     </div>
@@ -498,16 +515,16 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* ========== MODAL DE AGREGAR PRODUCTO ========== */}
+      {/* ========== MODAL DE AGREGAR PRODUCTO (Responsive) ========== */}
       {showProductoModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full my-8">
-            <div className="flex items-center justify-between mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 max-w-2xl w-full my-8">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
               <div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
                   Agregar Nuevo Producto
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Complete los datos del producto
                 </p>
               </div>
@@ -521,7 +538,7 @@ export default function Inventory() {
 
             <form onSubmit={crearProducto} className="space-y-4">
               {/* Información básica */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Nombre del Producto <span className="text-red-500">*</span>
@@ -571,7 +588,7 @@ export default function Inventory() {
               </div>
 
               {/* Precios */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Precio de Compra
@@ -602,7 +619,7 @@ export default function Inventory() {
               </div>
 
               {/* Stock y alertas */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Stock Inicial
@@ -618,62 +635,56 @@ export default function Inventory() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Alerta de Stock
+                    Alerta Stock
                   </label>
                   <input
                     type="number"
                     value={productoForm.alerta_stock}
                     onChange={(e) => setProductoForm({ ...productoForm, alerta_stock: e.target.value })}
                     className="input w-full"
-                    placeholder="5"
+                    placeholder="10"
                   />
                 </div>
 
-                <div>
+                <div className="col-span-2 sm:col-span-1">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Unidad de Medida
+                    Segundas
                   </label>
-                  <select
-                    value={productoForm.unidad_medida}
-                    onChange={(e) => setProductoForm({ ...productoForm, unidad_medida: e.target.value })}
+                  <input
+                    type="number"
+                    value={productoForm.segundas_enviadas}
+                    onChange={(e) => setProductoForm({ ...productoForm, segundas_enviadas: e.target.value })}
                     className="input w-full"
-                  >
-                    <option value="unidad">Unidad</option>
-                    <option value="kg">Kilogramo</option>
-                    <option value="litro">Litro</option>
-                    <option value="metro">Metro</option>
-                    <option value="caja">Caja</option>
-                    <option value="paquete">Paquete</option>
-                  </select>
+                    placeholder="0"
+                  />
                 </div>
               </div>
 
-              {/* Checkbox de segunda */}
-              <div className="flex items-center gap-2 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                <input
-                  type="checkbox"
-                  id="incluye_segundas"
-                  checked={productoForm.incluye_segundas}
-                  onChange={(e) => setProductoForm({ ...productoForm, incluye_segundas: e.target.checked })}
-                  className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
-                />
-                <label htmlFor="incluye_segundas" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Material de segunda calidad
-                </label>
+              {/* Info de segundas */}
+              <div className="flex items-start gap-2 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                <AlertTriangle className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Segundas Enviadas
+                  </p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    Unidades que pasaron de primera a segunda por daños o defectos
+                  </p>
+                </div>
               </div>
 
               {/* Botones */}
-              <div className="flex gap-3 pt-4 border-t">
+              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
                 <button
                   type="button"
                   onClick={() => setShowProductoModal(false)}
-                  className="btn btn-secondary flex-1"
+                  className="btn btn-secondary flex-1 order-2 sm:order-1"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-primary flex-1"
+                  className="btn btn-primary flex-1 order-1 sm:order-2"
                 >
                   <Plus className="w-5 h-5 mr-2" />
                   Guardar Producto
@@ -684,17 +695,17 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* ========== MODAL DE DETALLE DE CATEGORÍA ========== */}
+      {/* ========== MODAL DE DETALLE DE CATEGORÍA (Responsive) ========== */}
       {showDetalleModal && categoriaSeleccionada && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-6xl w-full my-8">
-            <div className="flex items-center justify-between mb-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 max-w-6xl w-full my-8">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
               <div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  Detalle: {categoriaSeleccionada.categoria}
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {categoriaSeleccionada.categoria}
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400">
-                  {categoriaSeleccionada.productos.length + categoriaSeleccionada.productosSegunda.length} productos en total
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {categoriaSeleccionada.productos.length} productos
                 </p>
               </div>
               <button 
@@ -705,159 +716,117 @@ export default function Inventory() {
               </button>
             </div>
 
-            {/* Dashboard de totales */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+            {/* Dashboard de totales responsive */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 mb-4 sm:mb-6">
               <div className="card bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <div className="flex items-center gap-2 mb-1 sm:mb-2">
+                  <Package className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400" />
                   <p className="text-xs text-gray-600 dark:text-gray-400">Stock Inicial</p>
                 </div>
-                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                <p className="text-lg sm:text-2xl font-bold text-blue-600 dark:text-blue-400">
                   {categoriaSeleccionada.totales.stockInicial}
                 </p>
               </div>
 
               <div className="card bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+                <div className="flex items-center gap-2 mb-1 sm:mb-2">
+                  <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 dark:text-green-400" />
                   <p className="text-xs text-gray-600 dark:text-gray-400">Compras</p>
                 </div>
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                <p className="text-lg sm:text-2xl font-bold text-green-600 dark:text-green-400">
                   +{categoriaSeleccionada.totales.compras}
                 </p>
               </div>
 
               <div className="card bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <ShoppingCart className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                <div className="flex items-center gap-2 mb-1 sm:mb-2">
+                  <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 dark:text-purple-400" />
                   <p className="text-xs text-gray-600 dark:text-gray-400">Ventas</p>
                 </div>
-                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                <p className="text-lg sm:text-2xl font-bold text-purple-600 dark:text-purple-400">
                   -{categoriaSeleccionada.totales.ventas}
                 </p>
               </div>
 
               <div className="card bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <RotateCcw className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                  <p className="text-xs text-gray-600 dark:text-gray-400">Devoluciones</p>
+                <div className="flex items-center gap-2 mb-1 sm:mb-2">
+                  <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600 dark:text-orange-400" />
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Segundas</p>
                 </div>
-                <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                  {categoriaSeleccionada.totales.devoluciones}
+                <p className="text-lg sm:text-2xl font-bold text-orange-600 dark:text-orange-400">
+                  {categoriaSeleccionada.totales.segundasEnviadas}
                 </p>
               </div>
 
               <div className="card bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <div className="flex items-center gap-2 mb-1 sm:mb-2">
+                  <Package className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
                   <p className="text-xs text-gray-600 dark:text-gray-400">Stock Actual</p>
                 </div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
                   {categoriaSeleccionada.totales.cantidad}
                 </p>
               </div>
 
-              <div className="card bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <DollarSign className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+              <div className="card bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 col-span-2 sm:col-span-3 lg:col-span-1">
+                <div className="flex items-center gap-2 mb-1 sm:mb-2">
+                  <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600 dark:text-yellow-400" />
                   <p className="text-xs text-gray-600 dark:text-gray-400">Valor Total</p>
                 </div>
-                <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400">
+                <p className="text-base sm:text-xl font-bold text-yellow-600 dark:text-yellow-400">
                   ${categoriaSeleccionada.totales.valorCompra.toLocaleString()}
                 </p>
               </div>
             </div>
 
-            {/* Lista de productos de primera */}
-            {categoriaSeleccionada.productos.length > 0 && (
-              <div className="mb-6">
-                <h4 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">
-                  Productos ({categoriaSeleccionada.productos.length})
-                </h4>
-                <div className="card overflow-x-auto">
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Código</th>
-                        <th>Nombre</th>
-                        <th>Stock Actual</th>
-                        <th>P. Compra</th>
-                        <th>P. Venta</th>
-                        <th>Ventas</th>
-                        <th>Compras</th>
+            {/* Lista de productos - Tabla responsive */}
+            <div className="mb-6">
+              <h4 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">
+                Productos ({categoriaSeleccionada.productos.length})
+              </h4>
+              <div className="card overflow-x-auto">
+                <table className="table text-sm">
+                  <thead>
+                    <tr>
+                      <th className="hidden sm:table-cell">Código</th>
+                      <th>Nombre</th>
+                      <th>Stock</th>
+                      <th className="hidden md:table-cell">P. Compra</th>
+                      <th className="hidden md:table-cell">P. Venta</th>
+                      <th className="hidden lg:table-cell">Ventas</th>
+                      <th className="hidden lg:table-cell">Segundas</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {categoriaSeleccionada.productos.map(prod => (
+                      <tr key={prod.id}>
+                        <td className="hidden sm:table-cell font-mono text-xs">{prod.codigo_articulo}</td>
+                        <td className="font-medium">{prod.nombre}</td>
+                        <td>
+                          <span className={`badge ${
+                            prod.stock_actual > prod.alerta_stock ? 'badge-success' : 'badge-warning'
+                          }`}>
+                            {prod.stock_actual || 0}
+                          </span>
+                        </td>
+                        <td className="hidden md:table-cell">${(prod.precio_compra || 0).toLocaleString()}</td>
+                        <td className="hidden md:table-cell font-semibold text-primary-600">
+                          ${(prod.precio_venta || 0).toLocaleString()}
+                        </td>
+                        <td className="hidden lg:table-cell">{prod.ventas || 0}</td>
+                        <td className="hidden lg:table-cell">
+                          {prod.segundas_enviadas > 0 && (
+                            <span className="badge badge-orange">
+                              {prod.segundas_enviadas}
+                            </span>
+                          )}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                      {categoriaSeleccionada.productos.map(prod => (
-                        <tr key={prod.id}>
-                          <td className="font-mono text-sm">{prod.codigo_articulo}</td>
-                          <td className="font-medium">{prod.nombre}</td>
-                          <td>
-                            <span className={`badge ${
-                              prod.stock_actual > prod.alerta_stock ? 'badge-success' : 'badge-warning'
-                            }`}>
-                              {prod.stock_actual || 0}
-                            </span>
-                          </td>
-                          <td>${(prod.precio_compra || 0).toLocaleString()}</td>
-                          <td className="font-semibold text-primary-600">
-                            ${(prod.precio_venta || 0).toLocaleString()}
-                          </td>
-                          <td>{prod.ventas || 0}</td>
-                          <td>{prod.compras || 0}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            )}
-
-            {/* Lista de productos de segunda */}
-            {categoriaSeleccionada.productosSegunda.length > 0 && (
-              <div>
-                <h4 className="text-lg font-bold text-orange-600 dark:text-orange-400 mb-4 flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5" />
-                  Materiales de Segunda ({categoriaSeleccionada.productosSegunda.length})
-                </h4>
-                <div className="card overflow-x-auto bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Código</th>
-                        <th>Nombre</th>
-                        <th>Stock Actual</th>
-                        <th>P. Compra</th>
-                        <th>P. Venta</th>
-                        <th>Calidad</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-orange-200 dark:divide-orange-800">
-                      {categoriaSeleccionada.productosSegunda.map(prod => (
-                        <tr key={prod.id}>
-                          <td className="font-mono text-sm">{prod.codigo_articulo}</td>
-                          <td className="font-medium">{prod.nombre}</td>
-                          <td>
-                            <span className="badge badge-warning">
-                              {prod.stock_actual || 0}
-                            </span>
-                          </td>
-                          <td>${(prod.precio_compra || 0).toLocaleString()}</td>
-                          <td className="font-semibold">
-                            ${(prod.precio_venta || 0).toLocaleString()}
-                          </td>
-                          <td>
-                            <span className="text-xs text-orange-600 dark:text-orange-400">
-                              Segunda
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         </div>
       )}
