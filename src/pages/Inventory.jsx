@@ -11,7 +11,7 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true)
   const [showCategoriaModal, setShowCategoriaModal] = useState(false)
   const [showDetalleModal, setShowDetalleModal] = useState(false)
-  const [showProductoModal, setShowProductoModal] = useState(false) // 👈 NUEVO ESTADO
+  const [showProductoModal, setShowProductoModal] = useState(false)
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null)
   const [sucursalId, setSucursalId] = useState(null)
   
@@ -19,7 +19,6 @@ export default function Inventory() {
     nombre: ''
   })
 
-  // 👇 NUEVO: Estado para el formulario de producto
   const [productoForm, setProductoForm] = useState({
     nombre: '',
     codigo_articulo: '',
@@ -27,7 +26,7 @@ export default function Inventory() {
     precio_compra: '',
     precio_venta: '',
     stock_inicial: '',
-    alerta_stock: '',
+    alerta_stock: '5',
     unidad_medida: 'unidad',
     incluye_segundas: false
   })
@@ -117,12 +116,11 @@ export default function Inventory() {
     }
   }
 
-  // 👇 NUEVA FUNCIÓN: Crear producto
   const crearProducto = async (e) => {
     e.preventDefault()
     
     try {
-      // Validaciones básicas
+      // Validaciones
       if (!productoForm.nombre || !productoForm.codigo_articulo) {
         alert('⚠️ Nombre y código son obligatorios')
         return
@@ -132,28 +130,37 @@ export default function Inventory() {
       const precioVenta = parseFloat(productoForm.precio_venta) || 0
       const stockInicial = parseInt(productoForm.stock_inicial) || 0
 
-      const { error } = await supabase
+      const nuevoProducto = {
+        sucursal_id: sucursalId,
+        nombre: productoForm.nombre,
+        codigo_articulo: productoForm.codigo_articulo,
+        categoria: productoForm.categoria || 'Sin categoría',
+        precio_compra: precioCompra,
+        precio_venta: precioVenta,
+        stock_inicial: stockInicial,
+        stock_actual: stockInicial,
+        alerta_stock: parseInt(productoForm.alerta_stock) || 5,
+        unidad_medida: productoForm.unidad_medida,
+        incluye_segundas: productoForm.incluye_segundas,
+        utilidad_articulo: precioVenta - precioCompra,
+        ventas: 0,
+        compras: 0,
+        devoluciones: 0
+      }
+
+      console.log('Creando producto:', nuevoProducto)
+
+      const { data, error } = await supabase
         .from('inventario')
-        .insert({
-          sucursal_id: sucursalId,
-          nombre: productoForm.nombre,
-          codigo_articulo: productoForm.codigo_articulo,
-          categoria: productoForm.categoria || 'Sin categoría',
-          precio_compra: precioCompra,
-          precio_venta: precioVenta,
-          stock_inicial: stockInicial,
-          stock_actual: stockInicial,
-          alerta_stock: parseInt(productoForm.alerta_stock) || 5,
-          unidad_medida: productoForm.unidad_medida,
-          incluye_segundas: productoForm.incluye_segundas,
-          utilidad_articulo: precioVenta - precioCompra,
-          ventas: 0,
-          compras: 0,
-          devoluciones: 0
-        })
+        .insert(nuevoProducto)
+        .select()
 
-      if (error) throw error
+      if (error) {
+        console.error('Error de Supabase:', error)
+        throw error
+      }
 
+      console.log('Producto creado:', data)
       alert('✅ Producto creado exitosamente')
       
       // Resetear formulario
@@ -164,7 +171,7 @@ export default function Inventory() {
         precio_compra: '',
         precio_venta: '',
         stock_inicial: '',
-        alerta_stock: '',
+        alerta_stock: '5',
         unidad_medida: 'unidad',
         incluye_segundas: false
       })
@@ -173,7 +180,8 @@ export default function Inventory() {
       await cargarInventario(sucursalId)
       
     } catch (err) {
-      alert('Error al crear producto: ' + err.message)
+      console.error('Error completo:', err)
+      alert('❌ Error al crear producto: ' + err.message)
     }
   }
 
@@ -270,7 +278,7 @@ export default function Inventory() {
             Categorías
           </button>
           <button 
-            onClick={() => setShowProductoModal(true)}  {/* 👈 CAMBIADO: Ahora abre modal */}
+            onClick={() => setShowProductoModal(true)}
             className="btn btn-primary flex items-center gap-2"
           >
             <Plus className="w-5 h-5" />
@@ -430,7 +438,7 @@ export default function Inventory() {
         )}
       </div>
 
-      {/* Modal de categorías */}
+      {/* ========== MODAL DE CATEGORÍAS ========== */}
       {showCategoriaModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full">
@@ -490,14 +498,19 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* 👇 NUEVO: Modal de agregar producto */}
+      {/* ========== MODAL DE AGREGAR PRODUCTO ========== */}
       {showProductoModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full my-8">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                Agregar Nuevo Producto
-              </h3>
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  Agregar Nuevo Producto
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Complete los datos del producto
+                </p>
+              </div>
               <button 
                 onClick={() => setShowProductoModal(false)}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
@@ -511,7 +524,7 @@ export default function Inventory() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Nombre del Producto *
+                    Nombre del Producto <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -525,7 +538,7 @@ export default function Inventory() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Código del Artículo *
+                    Código del Artículo <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -588,7 +601,7 @@ export default function Inventory() {
                 </div>
               </div>
 
-              {/* Stock */}
+              {/* Stock y alertas */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -636,21 +649,21 @@ export default function Inventory() {
               </div>
 
               {/* Checkbox de segunda */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                 <input
                   type="checkbox"
                   id="incluye_segundas"
                   checked={productoForm.incluye_segundas}
                   onChange={(e) => setProductoForm({ ...productoForm, incluye_segundas: e.target.checked })}
-                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                  className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
                 />
-                <label htmlFor="incluye_segundas" className="text-sm text-gray-700 dark:text-gray-300">
-                  Material de segunda
+                <label htmlFor="incluye_segundas" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Material de segunda calidad
                 </label>
               </div>
 
               {/* Botones */}
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3 pt-4 border-t">
                 <button
                   type="button"
                   onClick={() => setShowProductoModal(false)}
@@ -662,6 +675,7 @@ export default function Inventory() {
                   type="submit"
                   className="btn btn-primary flex-1"
                 >
+                  <Plus className="w-5 h-5 mr-2" />
                   Guardar Producto
                 </button>
               </div>
@@ -670,7 +684,7 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* Modal de detalle de categoría */}
+      {/* ========== MODAL DE DETALLE DE CATEGORÍA ========== */}
       {showDetalleModal && categoriaSeleccionada && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-6xl w-full my-8">
