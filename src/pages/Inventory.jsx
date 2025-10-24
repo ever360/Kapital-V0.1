@@ -180,19 +180,7 @@ export default function Inventory() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Inventario por Categorías</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Vista agrupada con detalles</p>
-        </div>
-        <button 
-          onClick={() => setShowCategoriaModal(true)}
-          className="btn btn-primary flex items-center gap-2"
-        >
-          <FolderPlus className="w-5 h-5" />
-          Add Categorías
-        </button>
-      </div>
+     
 
       <div className="flex items-center justify-between mb-6">
   <div>
