@@ -183,16 +183,41 @@ export default function Inventory() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Inventario por Categorías</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Vista agrupada con detalle</p>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Vista agrupada con detalles</p>
         </div>
         <button 
           onClick={() => setShowCategoriaModal(true)}
           className="btn btn-primary flex items-center gap-2"
         >
           <FolderPlus className="w-5 h-5" />
-          Gestionar Categorías
+          Add Categorías
         </button>
       </div>
+
+      <div className="flex items-center justify-between mb-6">
+  <div>
+    <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+      Inventario por Categorías
+    </h1>
+    <p className="text-gray-600 dark:text-gray-400 mt-1">Vista agrupada con detalle</p>
+  </div>
+  <div className="flex gap-3">
+    <button 
+      onClick={() => setShowCategoriaModal(true)}
+      className="btn btn-secondary flex items-center gap-2"
+    >
+      <FolderPlus className="w-5 h-5" />
+      Categorías
+    </button>
+    <button 
+      onClick={() => navigate('/nuevo-producto')}  // 👈 ESTE ES EL BOTÓN
+      className="btn btn-primary flex items-center gap-2"
+    >
+      <Plus className="w-5 h-5" />
+      Nuevo Producto
+    </button>
+  </div>
+</div>
 
       {/* Estadísticas generales */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
