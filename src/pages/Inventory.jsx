@@ -1,31 +1,23 @@
 import { useState, useEffect } from 'react'
-import { Package, Plus, Search, Edit, Trash2, X, Save, Tag, FolderPlus } from 'lucide-react'
+import { Package, Plus, Search, Edit, Trash2, X, Save, AlertTriangle } from 'lucide-react'
 import { supabase } from '../services/supabase'
 
 export default function Inventory() {
   const [search, setSearch] = useState('')
   const [productos, setProductos] = useState([])
-  const [categorias, setCategorias] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
-  const [showCategoriaModal, setShowCategoriaModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [sucursalId, setSucursalId] = useState(null)
   
   const [formData, setFormData] = useState({
     codigo_articulo: '',
     nombre: '',
-    marca: '',
-    categoria_id: '',
+    categoria: '',
     precio_compra: '',
     precio_venta: '',
-    cantidad: '',
-    es_segunda: false,
-    calidad: 'primera'
-  })
-
-  const [categoriaForm, setCategoriaForm] = useState({
-    nombre: ''
+    stock_inicial: '',
+    alerta_stock: '10'
   })
 
   useEffect(() => {
@@ -35,7 +27,12 @@ export default function Inventory() {
   const inicializar = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        console.error('❌ No hay usuario autenticado')
+        return
+      }
+
+      console.log('👤 Usuario autenticado:', user.email)
 
       const { data: userData } = await supabase
         .from('usuarios')
@@ -43,128 +40,74 @@ export default function Inventory() {
         .eq('id', user.id)
         .single()
 
+      console.log('🏢 Datos del usuario:', userData)
+
       if (userData?.sucursal_id) {
         setSucursalId(userData.sucursal_id)
-        await Promise.all([
-          cargarProductos(userData.sucursal_id),
-          cargarCategorias(userData.sucursal_id)
-        ])
+        console.log('✅ Sucursal ID asignada:', userData.sucursal_id)
+        await cargarInventario(userData.sucursal_id)
+      } else {
+        console.error('❌ Usuario sin sucursal_id asignada')
+        alert('❌ Tu usuario no tiene una sucursal asignada.')
       }
     } catch (err) {
-      console.error('Error al inicializar:', err)
+      console.error('💥 Error al inicializar:', err)
     }
   }
 
-  const cargarProductos = async (sucId) => {
+  const cargarInventario = async (sucId) => {
     try {
       setLoading(true)
       
-      console.log('📦 Cargando productos para sucursal:', sucId)
+      console.log('📦 Cargando inventario para sucursal:', sucId)
       
-      // Primero cargar productos
-      const { data: productosData, error: productosError } = await supabase
-        .from('productos')
+      const { data, error } = await supabase
+        .from('inventario')
         .select('*')
         .eq('sucursal_id', sucId)
         .order('nombre')
 
-      if (productosError) {
-        console.error('❌ Error al cargar productos:', productosError)
-        throw productosError
+      if (error) {
+        console.error('❌ Error al cargar inventario:', error)
+        throw error
       }
 
-      console.log('✅ Productos cargados de BD:', productosData?.length || 0, productosData)
-
-      // Luego cargar categorías para hacer el join manual
-      const { data: categoriasData } = await supabase
-        .from('categorias')
-        .select('id, nombre')
-        .eq('sucursal_id', sucId)
-
-      // Mapear productos con sus categorías
-      const productosConCategoria = (productosData || []).map(producto => {
-        const categoria = categoriasData?.find(c => c.id === producto.categoria_id)
-        return {
-          ...producto,
-          categoria_nombre: categoria?.nombre || null
-        }
-      })
-
-      console.log('✅ Productos procesados con categorías:', productosConCategoria.length)
-      setProductos(productosConCategoria)
+      console.log('✅ Inventario cargado de BD:', data?.length || 0, data)
+      setProductos(data || [])
       
     } catch (err) {
-      console.error('💥 Error completo al cargar productos:', err)
-      alert('Error al cargar productos: ' + err.message)
+      console.error('💥 Error completo al cargar inventario:', err)
+      alert('Error al cargar inventario: ' + err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const cargarCategorias = async (sucId) => {
-    try {
-      const { data, error } = await supabase
-        .from('categorias')
-        .select('*')
-        .eq('sucursal_id', sucId)
-        .order('nombre')
-
-      if (error) throw error
-      setCategorias(data || [])
-    } catch (err) {
-      console.error('Error al cargar categorías:', err)
-    }
-  }
-
-  const crearCategoria = async (e) => {
-    e.preventDefault()
-    
-    try {
-      const { error } = await supabase
-        .from('categorias')
-        .insert({
-          sucursal_id: sucursalId,
-          nombre: categoriaForm.nombre,
-          id_categoria: `CAT-${Date.now()}`
-        })
-
-      if (error) throw error
-
-      alert('Categoría creada exitosamente')
-      setCategoriaForm({ nombre: '' })
-      setShowCategoriaModal(false)
-      cargarCategorias(sucursalId)
-    } catch (err) {
-      console.error('Error al crear categoría:', err)
-      alert('Error al crear categoría: ' + err.message)
-    }
-  }
-
-  const eliminarCategoria = async (id, nombre) => {
-    if (!confirm(`¿Eliminar la categoría "${nombre}"? Los productos asociados quedarán sin categoría.`)) return
-
-    try {
-      const { error } = await supabase
-        .from('categorias')
-        .delete()
-        .eq('id', id)
-
-      if (error) throw error
-
-      alert('Categoría eliminada')
-      cargarCategorias(sucursalId)
-      cargarProductos(sucursalId)
-    } catch (err) {
-      alert('Error: ' + err.message)
-    }
+  const calcularUtilidad = (precioCompra, precioVenta) => {
+    const compra = parseFloat(precioCompra) || 0
+    const venta = parseFloat(precioVenta) || 0
+    const utilidad = venta - compra
+    const porcentaje = compra > 0 ? ((utilidad / compra) * 100).toFixed(2) : 0
+    return { utilidad, porcentaje }
   }
 
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target
-    setFormData({
+    const { name, value } = e.target
+    const newFormData = {
       ...formData,
-      [name]: type === 'checkbox' ? checked : value
-    })
+      [name]: value
+    }
+    
+    // Recalcular utilidad si cambian los precios
+    if (name === 'precio_compra' || name === 'precio_venta') {
+      const { utilidad, porcentaje } = calcularUtilidad(
+        name === 'precio_compra' ? value : formData.precio_compra,
+        name === 'precio_venta' ? value : formData.precio_venta
+      )
+      console.log('💰 Utilidad calculada:', utilidad, 'Porcentaje:', porcentaje + '%')
+    }
+    
+    setFormData(newFormData)
   }
 
   const abrirModalNuevo = async () => {
@@ -172,18 +115,16 @@ export default function Inventory() {
     
     // Generar código automático
     const timestamp = Date.now()
-    const codigoAuto = `PROD${timestamp.toString().slice(-8)}`
+    const codigoAuto = `INV${timestamp.toString().slice(-8)}`
     
     setFormData({
-      codigo_articulo: codigoAuto, // Código auto-generado
+      codigo_articulo: codigoAuto,
       nombre: '',
-      marca: '',
-      categoria_id: '',
+      categoria: '',
       precio_compra: '',
       precio_venta: '',
-      cantidad: '',
-      es_segunda: false,
-      calidad: 'primera'
+      stock_inicial: '',
+      alerta_stock: '10'
     })
     setShowModal(true)
   }
@@ -193,13 +134,11 @@ export default function Inventory() {
     setFormData({
       codigo_articulo: producto.codigo_articulo || '',
       nombre: producto.nombre || '',
-      marca: producto.marca || '',
-      categoria_id: producto.categoria_id || '',
+      categoria: producto.categoria || '',
       precio_compra: producto.precio_compra || '',
       precio_venta: producto.precio_venta || '',
-      cantidad: producto.cantidad || '',
-      es_segunda: producto.es_segunda || false,
-      calidad: producto.calidad || 'primera'
+      stock_inicial: producto.stock_inicial || '',
+      alerta_stock: producto.alerta_stock || '10'
     })
     setShowModal(true)
   }
@@ -207,10 +146,8 @@ export default function Inventory() {
   const guardarProducto = async (e) => {
     e.preventDefault()
 
-    // DEBUG: Verificar sucursal_id
     if (!sucursalId) {
-      alert('❌ ERROR: No tienes sucursal asignada. Tu usuario debe tener una sucursal_id en la tabla usuarios.')
-      console.error('Usuario sin sucursal_id')
+      alert('❌ ERROR: No tienes sucursal asignada.')
       return
     }
 
@@ -221,25 +158,38 @@ export default function Inventory() {
     })
 
     try {
+      const precioCompra = parseFloat(formData.precio_compra) || 0
+      const precioVenta = parseFloat(formData.precio_venta) || 0
+      const stockInicial = parseInt(formData.stock_inicial) || 0
+      
+      const { utilidad, porcentaje } = calcularUtilidad(precioCompra, precioVenta)
+      
       const productoData = {
         sucursal_id: sucursalId,
         codigo_articulo: formData.codigo_articulo,
         nombre: formData.nombre,
-        marca: formData.marca || null,
-        categoria_id: formData.categoria_id || null,
-        precio_compra: parseFloat(formData.precio_compra) || 0,
-        precio_venta: parseFloat(formData.precio_venta) || 0,
-        cantidad: parseInt(formData.cantidad) || 0,
-        es_segunda: formData.es_segunda,
-        calidad: formData.calidad,
-        tiempo: new Date().toISOString()
+        categoria: formData.categoria || null,
+        precio_compra: precioCompra,
+        precio_venta: precioVenta,
+        utilidad_articulo: utilidad,
+        porcentaje_utilidad: parseFloat(porcentaje),
+        stock_inicial: stockInicial,
+        stock_actual: stockInicial, // Al crear, stock_actual = stock_inicial
+        alerta_stock: parseInt(formData.alerta_stock) || 10,
+        compras: 0,
+        ventas: 0,
+        devoluciones: 0,
+        segundas_enviadas: 0
       }
 
       if (editingProduct) {
         console.log('🔄 Actualizando producto ID:', editingProduct.id)
         
+        // Al editar, mantener el stock_actual pero actualizar stock_inicial si cambió
+        productoData.stock_actual = editingProduct.stock_actual
+        
         const { data, error } = await supabase
-          .from('productos')
+          .from('inventario')
           .update(productoData)
           .eq('id', editingProduct.id)
           .select()
@@ -255,30 +205,24 @@ export default function Inventory() {
         console.log('➕ Creando nuevo producto...')
         
         const { data, error } = await supabase
-          .from('productos')
+          .from('inventario')
           .insert({
             ...productoData,
-            pid_ms: `PROD-${Date.now()}`
+            id_inventario: `INV-${Date.now()}`
           })
           .select()
 
         if (error) {
           console.error('❌ Error de Supabase:', error)
-          console.error('Detalles del error:', {
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-            code: error.code
-          })
           throw error
         }
         
         console.log('✅ Producto creado en BD:', data)
-        alert('✅ Producto creado exitosamente en la base de datos')
+        alert('✅ Producto creado exitosamente')
       }
 
       setShowModal(false)
-      await cargarProductos(sucursalId)
+      await cargarInventario(sucursalId)
       
     } catch (err) {
       console.error('💥 Error completo:', err)
@@ -291,55 +235,50 @@ export default function Inventory() {
       } else if (err.message.includes('duplicate')) {
         errorMessage += '❌ CÓDIGO DUPLICADO\n'
         errorMessage += 'Ya existe un producto con ese código'
-      } else if (err.message.includes('violates foreign key')) {
-        errorMessage += '❌ SUCURSAL NO VÁLIDA\n'
-        errorMessage += 'Tu sucursal_id no existe en la tabla sucursales'
       } else {
         errorMessage += err.message
       }
-      
-      errorMessage += '\n\nRevisa la consola (F12) para más detalles'
       
       alert(errorMessage)
     }
   }
 
   const eliminarProducto = async (id, nombre) => {
-    if (!confirm(`¿Estás seguro de eliminar el producto "${nombre}"?`)) return
+    if (!confirm(`¿Estás seguro de eliminar "${nombre}" del inventario?`)) return
 
     try {
       const { error } = await supabase
-        .from('productos')
+        .from('inventario')
         .delete()
         .eq('id', id)
 
       if (error) throw error
 
-      alert('Producto eliminado exitosamente')
-      cargarProductos(sucursalId)
+      alert('✅ Producto eliminado del inventario')
+      cargarInventario(sucursalId)
     } catch (err) {
-      console.error('Error al eliminar producto:', err)
-      alert('Error al eliminar el producto: ' + err.message)
+      console.error('Error al eliminar:', err)
+      alert('Error al eliminar: ' + err.message)
     }
   }
 
   const productosFiltrados = productos.filter(p =>
     p.nombre.toLowerCase().includes(search.toLowerCase()) ||
     p.codigo_articulo.toLowerCase().includes(search.toLowerCase()) ||
-    (p.marca && p.marca.toLowerCase().includes(search.toLowerCase())) ||
-    (p.categoria_nombre && p.categoria_nombre.toLowerCase().includes(search.toLowerCase()))
+    (p.categoria && p.categoria.toLowerCase().includes(search.toLowerCase()))
   )
 
   const calcularEstadisticas = () => {
     const totalProductos = productos.length
-    const stockTotal = productos.reduce((sum, p) => sum + (p.cantidad || 0), 0)
+    const stockTotal = productos.reduce((sum, p) => sum + (p.stock_actual || 0), 0)
     const valorInventario = productos.reduce((sum, p) => 
-      sum + ((p.precio_compra || 0) * (p.cantidad || 0)), 0
+      sum + ((p.precio_compra || 0) * (p.stock_actual || 0)), 0
     )
-    const productosSinStock = productos.filter(p => (p.cantidad || 0) === 0).length
-    const productosSegunda = productos.filter(p => p.es_segunda).length
+    const productosAlertaStock = productos.filter(p => 
+      (p.stock_actual || 0) <= (p.alerta_stock || 10)
+    ).length
 
-    return { totalProductos, stockTotal, valorInventario, productosSinStock, productosSegunda }
+    return { totalProductos, stockTotal, valorInventario, productosAlertaStock }
   }
 
   const stats = calcularEstadisticas()
@@ -357,28 +296,19 @@ export default function Inventory() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Inventario</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Gestiona tus productos y categorías</p>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Control completo de tu inventario</p>
         </div>
-        <div className="flex gap-3">
-          <button 
-            onClick={() => setShowCategoriaModal(true)}
-            className="btn btn-secondary flex items-center gap-2"
-          >
-            <FolderPlus className="w-5 h-5" />
-            Categorías
-          </button>
-          <button 
-            onClick={abrirModalNuevo}
-            className="btn btn-primary flex items-center gap-2"
-          >
-            <Plus className="w-5 h-5" />
-            Nuevo Producto
-          </button>
-        </div>
+        <button 
+          onClick={abrirModalNuevo}
+          className="btn btn-primary flex items-center gap-2"
+        >
+          <Plus className="w-5 h-5" />
+          Nuevo Producto
+        </button>
       </div>
 
       {/* Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="card">
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Productos</p>
           <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalProductos}</p>
@@ -394,12 +324,11 @@ export default function Inventory() {
           </p>
         </div>
         <div className="card">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Sin Stock</p>
-          <p className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.productosSinStock}</p>
-        </div>
-        <div className="card">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Material 2da</p>
-          <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{stats.productosSegunda}</p>
+          <div className="flex items-center gap-2 mb-1">
+            <AlertTriangle className="w-4 h-4 text-orange-600" />
+            <p className="text-sm text-gray-600 dark:text-gray-400">Alerta Stock</p>
+          </div>
+          <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{stats.productosAlertaStock}</p>
         </div>
       </div>
 
@@ -412,12 +341,12 @@ export default function Inventory() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="input pl-10"
-            placeholder="Buscar productos por nombre, código, marca o categoría..."
+            placeholder="Buscar por nombre, código o categoría..."
           />
         </div>
       </div>
 
-      {/* Tabla de productos */}
+      {/* Tabla de inventario */}
       <div className="card">
         <div className="overflow-x-auto">
           <table className="table">
@@ -426,11 +355,11 @@ export default function Inventory() {
                 <th>Código</th>
                 <th>Producto</th>
                 <th>Categoría</th>
-                <th>Marca</th>
-                <th>Calidad</th>
                 <th>Stock</th>
                 <th>P. Compra</th>
                 <th>P. Venta</th>
+                <th>Utilidad</th>
+                <th>%</th>
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -438,7 +367,7 @@ export default function Inventory() {
               {productosFiltrados.length === 0 ? (
                 <tr>
                   <td colSpan="9" className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    {search ? 'No se encontraron productos' : 'No hay productos registrados'}
+                    {search ? 'No se encontraron productos' : 'No hay productos en inventario'}
                   </td>
                 </tr>
               ) : (
@@ -449,38 +378,45 @@ export default function Inventory() {
                       <p className="font-medium text-gray-900 dark:text-gray-100">{producto.nombre}</p>
                     </td>
                     <td>
-                      {producto.categoria_nombre ? (
-                        <span className="badge badge-info">
-                          {producto.categoria_nombre}
+                      {producto.categoria ? (
+                        <span className="badge badge-info text-xs">
+                          {producto.categoria}
                         </span>
                       ) : (
-                        <span className="text-gray-400 text-sm">Sin categoría</span>
-                      )}
-                    </td>
-                    <td className="text-gray-600 dark:text-gray-400">{producto.marca || '-'}</td>
-                    <td>
-                      {producto.es_segunda ? (
-                        <span className="badge badge-warning">
-                          {producto.calidad || 'Segunda'}
-                        </span>
-                      ) : (
-                        <span className="badge badge-success">Primera</span>
+                        <span className="text-gray-400 text-sm">-</span>
                       )}
                     </td>
                     <td>
-                      <span className={`badge ${
-                        (producto.cantidad || 0) > 10 ? 'badge-success' : 
-                        (producto.cantidad || 0) > 0 ? 'badge-warning' : 
-                        'badge-danger'
-                      }`}>
-                        {producto.cantidad || 0}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`badge ${
+                          (producto.stock_actual || 0) > (producto.alerta_stock || 10) ? 'badge-success' : 
+                          (producto.stock_actual || 0) > 0 ? 'badge-warning' : 
+                          'badge-danger'
+                        }`}>
+                          {producto.stock_actual || 0}
+                        </span>
+                        {(producto.stock_actual || 0) <= (producto.alerta_stock || 10) && (
+                          <AlertTriangle className="w-4 h-4 text-orange-500" title="Alerta de stock bajo" />
+                        )}
+                      </div>
                     </td>
                     <td className="text-gray-600 dark:text-gray-400">
                       ${(producto.precio_compra || 0).toLocaleString()}
                     </td>
                     <td className="font-semibold text-primary-600 dark:text-primary-400">
                       ${(producto.precio_venta || 0).toLocaleString()}
+                    </td>
+                    <td className="text-green-600 dark:text-green-400">
+                      ${(producto.utilidad_articulo || 0).toLocaleString()}
+                    </td>
+                    <td>
+                      <span className={`text-sm font-semibold ${
+                        (producto.porcentaje_utilidad || 0) > 0 
+                          ? 'text-green-600 dark:text-green-400' 
+                          : 'text-gray-400'
+                      }`}>
+                        {(producto.porcentaje_utilidad || 0).toFixed(1)}%
+                      </span>
                     </td>
                     <td>
                       <div className="flex items-center gap-2">
@@ -507,76 +443,6 @@ export default function Inventory() {
           </table>
         </div>
       </div>
-
-      {/* Modal de gestión de categorías */}
-      {showCategoriaModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                Gestionar Categorías
-              </h3>
-              <button 
-                onClick={() => setShowCategoriaModal(false)}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Formulario nueva categoría */}
-            <form onSubmit={crearCategoria} className="mb-6">
-              <div className="flex gap-3">
-                <input
-                  type="text"
-                  value={categoriaForm.nombre}
-                  onChange={(e) => setCategoriaForm({ nombre: e.target.value })}
-                  className="input flex-1"
-                  placeholder="Nombre de la categoría"
-                  required
-                />
-                <button type="submit" className="btn btn-primary">
-                  <Plus className="w-5 h-5" />
-                </button>
-              </div>
-            </form>
-
-            {/* Lista de categorías */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                Categorías existentes ({categorias.length})
-              </p>
-              {categorias.length === 0 ? (
-                <p className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  No hay categorías creadas
-                </p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {categorias.map(cat => (
-                    <div 
-                      key={cat.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Tag className="w-4 h-4 text-primary-600" />
-                        <span className="font-medium text-gray-900 dark:text-gray-100">
-                          {cat.nombre}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => eliminarCategoria(cat.id, cat.nombre)}
-                        className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-red-600 dark:text-red-400"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal de crear/editar producto */}
       {showModal && (
@@ -611,7 +477,7 @@ export default function Inventory() {
                     disabled={!!editingProduct}
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {editingProduct ? 'El código no se puede modificar' : 'Puedes modificar el código generado'}
+                    {editingProduct ? 'No se puede modificar' : 'Puedes modificar el código'}
                   </p>
                 </div>
 
@@ -619,17 +485,14 @@ export default function Inventory() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Categoría
                   </label>
-                  <select
-                    name="categoria_id"
-                    value={formData.categoria_id}
+                  <input
+                    type="text"
+                    name="categoria"
+                    value={formData.categoria}
                     onChange={handleInputChange}
                     className="input"
-                  >
-                    <option value="">Sin categoría</option>
-                    {categorias.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.nombre}</option>
-                    ))}
-                  </select>
+                    placeholder="Ej: Electrónica, Papelería"
+                  />
                 </div>
               </div>
 
@@ -648,60 +511,10 @@ export default function Inventory() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Marca
-                </label>
-                <input
-                  type="text"
-                  name="marca"
-                  value={formData.marca}
-                  onChange={handleInputChange}
-                  className="input"
-                  placeholder="Marca del producto"
-                />
-              </div>
-
-              {/* Material de Segunda */}
-              <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <input
-                    type="checkbox"
-                    id="es_segunda"
-                    name="es_segunda"
-                    checked={formData.es_segunda}
-                    onChange={handleInputChange}
-                    className="w-4 h-4"
-                  />
-                  <label htmlFor="es_segunda" className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    Es material de segunda
-                  </label>
-                </div>
-
-                {formData.es_segunda && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Calidad del material
-                    </label>
-                    <select
-                      name="calidad"
-                      value={formData.calidad}
-                      onChange={handleInputChange}
-                      className="input"
-                    >
-                      <option value="segunda">Segunda</option>
-                      <option value="tercera">Tercera</option>
-                      <option value="reparado">Reparado</option>
-                      <option value="usado">Usado</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Precio de Compra
+                    Precio de Compra *
                   </label>
                   <input
                     type="number"
@@ -712,6 +525,7 @@ export default function Inventory() {
                     placeholder="0"
                     min="0"
                     step="0.01"
+                    required
                   />
                 </div>
 
@@ -731,20 +545,64 @@ export default function Inventory() {
                     required
                   />
                 </div>
+              </div>
 
+              {/* Mostrar utilidad calculada */}
+              {(formData.precio_compra && formData.precio_venta) && (
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Utilidad por unidad</p>
+                      <p className="text-xl font-bold text-green-600 dark:text-green-400">
+                        ${calcularUtilidad(formData.precio_compra, formData.precio_venta).utilidad.toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Porcentaje de ganancia</p>
+                      <p className="text-xl font-bold text-green-600 dark:text-green-400">
+                        {calcularUtilidad(formData.precio_compra, formData.precio_venta).porcentaje}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Cantidad (Stock)
+                    Stock Inicial *
                   </label>
                   <input
                     type="number"
-                    name="cantidad"
-                    value={formData.cantidad}
+                    name="stock_inicial"
+                    value={formData.stock_inicial}
                     onChange={handleInputChange}
                     className="input"
                     placeholder="0"
                     min="0"
+                    required
                   />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {editingProduct ? 'Stock inicial registrado' : 'Se copiará a stock actual'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Alerta de Stock Bajo
+                  </label>
+                  <input
+                    type="number"
+                    name="alerta_stock"
+                    value={formData.alerta_stock}
+                    onChange={handleInputChange}
+                    className="input"
+                    placeholder="10"
+                    min="0"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Te avisará cuando llegue a este nivel
+                  </p>
                 </div>
               </div>
 
