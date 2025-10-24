@@ -11,11 +11,25 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true)
   const [showCategoriaModal, setShowCategoriaModal] = useState(false)
   const [showDetalleModal, setShowDetalleModal] = useState(false)
+  const [showProductoModal, setShowProductoModal] = useState(false) // 👈 NUEVO ESTADO
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null)
   const [sucursalId, setSucursalId] = useState(null)
   
   const [categoriaForm, setCategoriaForm] = useState({
     nombre: ''
+  })
+
+  // 👇 NUEVO: Estado para el formulario de producto
+  const [productoForm, setProductoForm] = useState({
+    nombre: '',
+    codigo_articulo: '',
+    categoria: '',
+    precio_compra: '',
+    precio_venta: '',
+    stock_inicial: '',
+    alerta_stock: '',
+    unidad_medida: 'unidad',
+    incluye_segundas: false
   })
 
   useEffect(() => {
@@ -103,6 +117,66 @@ export default function Inventory() {
     }
   }
 
+  // 👇 NUEVA FUNCIÓN: Crear producto
+  const crearProducto = async (e) => {
+    e.preventDefault()
+    
+    try {
+      // Validaciones básicas
+      if (!productoForm.nombre || !productoForm.codigo_articulo) {
+        alert('⚠️ Nombre y código son obligatorios')
+        return
+      }
+
+      const precioCompra = parseFloat(productoForm.precio_compra) || 0
+      const precioVenta = parseFloat(productoForm.precio_venta) || 0
+      const stockInicial = parseInt(productoForm.stock_inicial) || 0
+
+      const { error } = await supabase
+        .from('inventario')
+        .insert({
+          sucursal_id: sucursalId,
+          nombre: productoForm.nombre,
+          codigo_articulo: productoForm.codigo_articulo,
+          categoria: productoForm.categoria || 'Sin categoría',
+          precio_compra: precioCompra,
+          precio_venta: precioVenta,
+          stock_inicial: stockInicial,
+          stock_actual: stockInicial,
+          alerta_stock: parseInt(productoForm.alerta_stock) || 5,
+          unidad_medida: productoForm.unidad_medida,
+          incluye_segundas: productoForm.incluye_segundas,
+          utilidad_articulo: precioVenta - precioCompra,
+          ventas: 0,
+          compras: 0,
+          devoluciones: 0
+        })
+
+      if (error) throw error
+
+      alert('✅ Producto creado exitosamente')
+      
+      // Resetear formulario
+      setProductoForm({
+        nombre: '',
+        codigo_articulo: '',
+        categoria: '',
+        precio_compra: '',
+        precio_venta: '',
+        stock_inicial: '',
+        alerta_stock: '',
+        unidad_medida: 'unidad',
+        incluye_segundas: false
+      })
+      
+      setShowProductoModal(false)
+      await cargarInventario(sucursalId)
+      
+    } catch (err) {
+      alert('Error al crear producto: ' + err.message)
+    }
+  }
+
   // Agrupar productos por categoría
   const agruparPorCategoria = () => {
     const grupos = {}
@@ -180,139 +254,174 @@ export default function Inventory() {
 
   return (
     <div>
-     
-
       <div className="flex items-center justify-between mb-6">
-  <div>
-    <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-      Inventario por Categorías
-    </h1>
-    <p className="text-gray-600 dark:text-gray-400 mt-1">Vista agrupada con detalle</p>
-  </div>
-  <div className="flex gap-3">
-    <button 
-      onClick={() => setShowCategoriaModal(true)}
-      className="btn btn-secondary flex items-center gap-2"
-    >
-      <FolderPlus className="w-5 h-5" />
-      Categorías
-    </button>
-    <button 
-      onClick={() => navigate('/nuevo-producto')}  // 👈 ESTE ES EL BOTÓN
-      className="btn btn-primary flex items-center gap-2"
-    >
-      <Plus className="w-5 h-5" />
-      Nuevo Producto
-    </button>
-  </div>
-</div>
-
-      {/* Estadísticas generales */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="card">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Categorías</p>
-          <p className="text-2xl font-bold text-primary-600 dark:text-primary-400">{stats.totalCategorias}</p>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            Inventario por Categorías
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Vista agrupada con detalle</p>
         </div>
-        <div className="card">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Productos</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalProductos}</p>
-        </div>
-        <div className="card">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Stock Total</p>
-          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.stockTotal}</p>
-        </div>
-        <div className="card">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Valor Total</p>
-          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-            ${stats.valorTotal.toLocaleString()}
-          </p>
+        <div className="flex gap-3">
+          <button 
+            onClick={() => setShowCategoriaModal(true)}
+            className="btn btn-secondary flex items-center gap-2"
+          >
+            <FolderPlus className="w-5 h-5" />
+            Categorías
+          </button>
+          <button 
+            onClick={() => setShowProductoModal(true)}  {/* 👈 CAMBIADO: Ahora abre modal */}
+            className="btn btn-primary flex items-center gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            Agregar Producto
+          </button>
         </div>
       </div>
 
-      {/* Búsqueda */}
+      {/* Estadísticas */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="card bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-blue-500 rounded-lg">
+              <Tag className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Categorías</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                {stats.totalCategorias}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-green-500 rounded-lg">
+              <Package className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Productos</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                {stats.totalProductos}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-purple-500 rounded-lg">
+              <TrendingUp className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Stock Total</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                {stats.stockTotal}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-yellow-500 rounded-lg">
+              <DollarSign className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Valor Total</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                ${stats.valorTotal.toLocaleString()}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Barra de búsqueda */}
       <div className="card mb-6">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
             type="text"
+            placeholder="Buscar categoría..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="input pl-10"
-            placeholder="Buscar categorías..."
+            className="input pl-10 w-full"
           />
         </div>
       </div>
 
-      {/* Lista de categorías agrupadas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Lista de categorías */}
+      <div className="space-y-4">
         {gruposFiltrados.length === 0 ? (
-          <div className="col-span-full card text-center py-12">
-            <p className="text-gray-500 dark:text-gray-400">
-              {search ? 'No se encontraron categorías' : 'No hay productos en inventario'}
+          <div className="card text-center py-12">
+            <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600 dark:text-gray-400">
+              No hay productos en el inventario
             </p>
           </div>
         ) : (
-          gruposFiltrados.map((grupo, idx) => (
-            <div key={idx} className="card hover:shadow-lg transition-shadow cursor-pointer" onClick={() => verDetalle(grupo)}>
-              <div className="flex items-start justify-between mb-4">
+          gruposFiltrados.map((grupo) => (
+            <div key={grupo.categoria} className="card hover:shadow-lg transition-shadow">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="bg-primary-100 dark:bg-primary-900/30 p-3 rounded-lg">
-                    <Package className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+                  <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
+                    <Tag className="w-5 h-5 text-primary-600" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-lg text-gray-900 dark:text-gray-100">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
                       {grupo.categoria}
                     </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
                       {grupo.productos.length + grupo.productosSegunda.length} productos
                     </p>
                   </div>
                 </div>
-                <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
-                  <Eye className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                <button
+                  onClick={() => verDetalle(grupo)}
+                  className="btn btn-secondary flex items-center gap-2"
+                >
+                  <Eye className="w-4 h-4" />
+                  Ver detalle
                 </button>
               </div>
 
-              <div className="space-y-2 mb-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Stock actual:</span>
-                  <span className="font-bold text-lg text-gray-900 dark:text-gray-100">
-                    {grupo.totales.cantidad} unidades
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Valor inventario:</span>
-                  <span className="font-semibold text-purple-600 dark:text-purple-400">
-                    ${grupo.totales.valorCompra.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-
-              {grupo.productosSegunda.length > 0 && (
-                <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-2">
-                  <p className="text-xs text-orange-800 dark:text-orange-400 font-medium">
-                    ⚠️ Incluye {grupo.productosSegunda.length} productos de segunda
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Stock Inicial</p>
+                  <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                    {grupo.totales.stockInicial}
                   </p>
                 </div>
-              )}
-
-              <div className="mt-4 pt-4 border-t dark:border-gray-700 grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Compras</p>
-                  <p className="text-sm font-semibold text-green-600 dark:text-green-400">
+                <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Compras</p>
+                  <p className="text-lg font-bold text-green-600 dark:text-green-400">
                     +{grupo.totales.compras}
                   </p>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Ventas</p>
-                  <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Ventas</p>
+                  <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
                     -{grupo.totales.ventas}
                   </p>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Devol.</p>
-                  <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">
+                <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Devoluciones</p>
+                  <p className="text-lg font-bold text-orange-600 dark:text-orange-400">
                     {grupo.totales.devoluciones}
+                  </p>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Stock Actual</p>
+                  <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                    {grupo.totales.cantidad}
+                  </p>
+                </div>
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Valor Total</p>
+                  <p className="text-sm font-bold text-yellow-600 dark:text-yellow-400">
+                    ${grupo.totales.valorCompra.toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -321,13 +430,13 @@ export default function Inventory() {
         )}
       </div>
 
-      {/* Modal de gestión de categorías */}
+      {/* Modal de categorías */}
       {showCategoriaModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                Gestionar Categorías
+                Gestión de Categorías
               </h3>
               <button 
                 onClick={() => setShowCategoriaModal(false)}
@@ -338,16 +447,13 @@ export default function Inventory() {
             </div>
 
             <form onSubmit={crearCategoria} className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Nueva categoría
-              </label>
               <div className="flex gap-3">
                 <input
                   type="text"
+                  placeholder="Nombre de la categoría"
                   value={categoriaForm.nombre}
-                  onChange={(e) => setCategoriaForm({ nombre: e.target.value })}
+                  onChange={(e) => setCategoriaForm({ ...categoriaForm, nombre: e.target.value })}
                   className="input flex-1"
-                  placeholder="Ej: Estructura, Electrónica, etc."
                   required
                 />
                 <button type="submit" className="btn btn-primary">
@@ -356,12 +462,12 @@ export default function Inventory() {
               </div>
             </form>
 
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            <div>
+              <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">
                 Categorías existentes ({categorias.length})
-              </p>
+              </h4>
               {categorias.length === 0 ? (
-                <p className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <p className="text-center text-gray-500 dark:text-gray-400 py-8">
                   No hay categorías creadas
                 </p>
               ) : (
@@ -380,6 +486,186 @@ export default function Inventory() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 👇 NUEVO: Modal de agregar producto */}
+      {showProductoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full my-8">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                Agregar Nuevo Producto
+              </h3>
+              <button 
+                onClick={() => setShowProductoModal(false)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={crearProducto} className="space-y-4">
+              {/* Información básica */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Nombre del Producto *
+                  </label>
+                  <input
+                    type="text"
+                    value={productoForm.nombre}
+                    onChange={(e) => setProductoForm({ ...productoForm, nombre: e.target.value })}
+                    className="input w-full"
+                    placeholder="Ej: Cemento gris 50kg"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Código del Artículo *
+                  </label>
+                  <input
+                    type="text"
+                    value={productoForm.codigo_articulo}
+                    onChange={(e) => setProductoForm({ ...productoForm, codigo_articulo: e.target.value })}
+                    className="input w-full"
+                    placeholder="Ej: CEM-001"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Categoría */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Categoría
+                </label>
+                <select
+                  value={productoForm.categoria}
+                  onChange={(e) => setProductoForm({ ...productoForm, categoria: e.target.value })}
+                  className="input w-full"
+                >
+                  <option value="">Seleccionar categoría</option>
+                  {categorias.map(cat => (
+                    <option key={cat.id} value={cat.nombre}>
+                      {cat.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Precios */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Precio de Compra
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={productoForm.precio_compra}
+                    onChange={(e) => setProductoForm({ ...productoForm, precio_compra: e.target.value })}
+                    className="input w-full"
+                    placeholder="0.00"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Precio de Venta
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={productoForm.precio_venta}
+                    onChange={(e) => setProductoForm({ ...productoForm, precio_venta: e.target.value })}
+                    className="input w-full"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              {/* Stock */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Stock Inicial
+                  </label>
+                  <input
+                    type="number"
+                    value={productoForm.stock_inicial}
+                    onChange={(e) => setProductoForm({ ...productoForm, stock_inicial: e.target.value })}
+                    className="input w-full"
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Alerta de Stock
+                  </label>
+                  <input
+                    type="number"
+                    value={productoForm.alerta_stock}
+                    onChange={(e) => setProductoForm({ ...productoForm, alerta_stock: e.target.value })}
+                    className="input w-full"
+                    placeholder="5"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Unidad de Medida
+                  </label>
+                  <select
+                    value={productoForm.unidad_medida}
+                    onChange={(e) => setProductoForm({ ...productoForm, unidad_medida: e.target.value })}
+                    className="input w-full"
+                  >
+                    <option value="unidad">Unidad</option>
+                    <option value="kg">Kilogramo</option>
+                    <option value="litro">Litro</option>
+                    <option value="metro">Metro</option>
+                    <option value="caja">Caja</option>
+                    <option value="paquete">Paquete</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Checkbox de segunda */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="incluye_segundas"
+                  checked={productoForm.incluye_segundas}
+                  onChange={(e) => setProductoForm({ ...productoForm, incluye_segundas: e.target.checked })}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+                <label htmlFor="incluye_segundas" className="text-sm text-gray-700 dark:text-gray-300">
+                  Material de segunda
+                </label>
+              </div>
+
+              {/* Botones */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowProductoModal(false)}
+                  className="btn btn-secondary flex-1"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary flex-1"
+                >
+                  Guardar Producto
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
